@@ -1,0 +1,1505 @@
+<!doctype html>
+<!--
+  Swatch — a colour palette studio.
+
+  Browse a curated set of palettes you scroll through as a stack of cards, then
+  build your own with colour theory and export it anywhere. The reveal is
+  scroll-driven (CSS sticky + GSAP ScrollTrigger on Lenis smooth scroll) and a
+  soft three.js wash drifts behind it. Every hex is real, selectable DOM text,
+  one click to copy. Fonts and libraries are self-hosted — no third-party calls.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Swatch — Colour Palette Generator &amp; Builder</title>
+<meta name="description" content="A free colour palette generator and color tool. Browse curated palettes, build your own with colour theory, check contrast, then export to CSS, SVG or PNG." />
+<link rel="canonical" href="https://tryswatch.com/" />
+<meta name="theme-color" content="#F3F0E9" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Swatch" />
+<meta property="og:title" content="Swatch — Colour Palette Generator &amp; Builder" />
+<meta property="og:description" content="Browse curated palettes, build your own with colour theory, and export anywhere. Free, no account, no cookies." />
+<meta property="og:url" content="https://tryswatch.com/" />
+<meta property="og:image" content="https://tryswatch.com/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Swatch — a colour palette generator and builder" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Swatch — Colour Palette Generator &amp; Builder" />
+<meta name="twitter:description" content="Browse curated palettes, build your own with colour theory, and export anywhere. Free, no account, no cookies." />
+<meta name="twitter:image" content="https://tryswatch.com/og.png" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Swatch",
+  "alternateName": "Swatch Color Palette Generator",
+  "url": "https://tryswatch.com/",
+  "applicationCategory": "DesignApplication",
+  "operatingSystem": "Any (web browser)",
+  "description": "A free colour palette generator: browse curated palettes, build your own with colour theory, check contrast, and export to CSS, SVG or PNG.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "creator": { "@type": "Person", "name": "Lars Holmström", "url": "https://larsh.dev" }
+}
+</script>
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+
+<!-- everything self-hosted: fonts and libs ship from this repo, no third-party calls -->
+<link rel="preload" href="vendor/fonts/clash-display-700.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="vendor/fonts/clash-display-500.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="vendor/fonts.css" />
+
+<style>
+/* ============================================================
+   TOKENS - light mode, matte paper, deep-black ink
+   ============================================================ */
+:root{
+  --bg:#F3F0E9;          /* warm matte paper */
+  --bg-2:#EAE6DB;        /* recessed wash */
+  --ink:#16151B;         /* deep near-black */
+  --ink-2:#37343F;       /* softer ink */
+  --mut:#6F6B63;         /* warm grey, secondary */
+  --dim:#A8A299;         /* faint */
+  --line:rgba(22,21,27,.12);
+  --line-2:rgba(22,21,27,.24);
+  --card:#FBFAF6;
+
+  --display:"Clash Display",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --mono:"Martian Mono",ui-monospace,"SFMono-Regular",monospace;
+
+  --gut:clamp(20px,4.5vw,72px);
+  --stick:clamp(56px,9vh,108px);   /* where each card comes to rest */
+  --ease:cubic-bezier(.19,1,.22,1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scrollbar-width:none}
+::-webkit-scrollbar{width:0;height:0;display:none}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto !important}
+
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--display);font-weight:500;font-size:1rem;line-height:1.6;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+/* the faintest matte grain, above everything */
+body::after{
+  content:"";position:fixed;inset:0;z-index:120;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a{color:inherit}
+::selection{background:var(--ink);color:var(--bg)}
+
+.mono{font-family:var(--mono);font-weight:300;letter-spacing:.04em}
+.eyebrow{
+  font-family:var(--mono);font-weight:400;font-size:.7rem;
+  letter-spacing:.28em;text-transform:uppercase;color:var(--mut);
+}
+
+/* ambient three.js wash, behind everything */
+#amb{position:fixed;inset:0;z-index:0;pointer-events:none;filter:blur(34px);opacity:.55}
+
+/* ============================================================
+   NAV - centred floating pill: swatch · explore · build
+   ============================================================ */
+.nav{
+  position:fixed;top:clamp(14px,2.2vh,22px);left:50%;transform:translateX(-50%);z-index:90;
+  display:flex;align-items:center;gap:clamp(.8em,1.8vw,1.35em);
+  padding:.58em clamp(1.05em,2vw,1.55em);
+  border-radius:999px;border:1px solid var(--line);
+  background:rgba(248,246,240,.62);
+  -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 16px 36px -22px rgba(22,21,27,.5);
+  transition:transform .7s var(--ease),box-shadow .5s var(--ease);
+}
+.nav__item{
+  font-family:var(--display);font-weight:600;font-size:clamp(.96rem,1.5vw,1.14rem);
+  letter-spacing:-.015em;color:var(--ink-2);text-decoration:none;
+  position:relative;padding:.1em .12em;transition:color .35s var(--ease);
+}
+.nav__item.nav__brand{font-weight:700;letter-spacing:-.035em;color:var(--ink)}
+.nav__item:hover{color:var(--ink)}
+.nav__item::after{
+  content:"";position:absolute;left:0;right:0;bottom:-.34em;height:2px;border-radius:2px;
+  background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform .4s var(--ease);
+}
+.nav__item:hover::after,.nav__item.is-active::after{transform:scaleX(1)}
+.nav__item.is-active{color:var(--ink)}
+.nav__div{width:1px;height:.92em;background:var(--line-2);flex:none}
+@media (max-width:520px){ .nav{gap:.65em;padding:.5em .95em} .nav__item{font-size:.92rem} }
+
+main{position:relative;z-index:1}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{
+  min-height:100svh;display:flex;flex-direction:column;justify-content:center;
+  padding:14vh var(--gut) 8vh;position:relative;
+}
+.hero__eyebrow{margin-bottom:clamp(20px,3vw,34px)}
+.hero h1{
+  position:relative;z-index:2;align-self:flex-start;pointer-events:none;
+  font-weight:700;letter-spacing:-.045em;line-height:.86;
+  font-size:clamp(4.6rem,21vw,20rem);
+}
+.hero h1 .tail{color:var(--dim)}
+.hero__lead{
+  margin-top:clamp(22px,3.4vw,40px);max-width:30ch;
+  font-weight:500;font-size:clamp(1.15rem,2.4vw,1.7rem);line-height:1.3;color:var(--ink-2);
+  letter-spacing:-.01em;
+}
+/* hero swatch blocks: bold colour, hex on hover, striking beside the wordmark.
+   Base (mobile/tablet) = a row above the wordmark; desktop = a column at the right. */
+.hero__swatches{display:flex;gap:clamp(8px,1vw,14px);margin-bottom:clamp(22px,3.2vw,38px)}
+.hsw{position:relative;display:block;will-change:transform,opacity;transform-origin:center}
+.hsw i{display:block;width:clamp(55px,7.4vw,99px);height:clamp(70px,9.4vw,128px);background:var(--c);border-radius:6px;
+  box-shadow:inset 0 0 0 1px rgba(22,21,27,.1)}
+.hsw b{position:absolute;left:0;bottom:0;padding:.55em .64em;
+  font-family:var(--mono);font-weight:400;font-size:clamp(.5rem,.85vw,.62rem);letter-spacing:.04em;
+  color:rgba(20,19,25,.9);opacity:0;transition:opacity .3s var(--ease);pointer-events:none}
+.hsw:hover b{opacity:1}
+@media (min-width:861px){
+  .hero__swatches{position:absolute;right:clamp(18px,2vw,38px);top:50%;transform:translateY(-50%);
+    flex-direction:column;gap:clamp(8px,1vh,13px);margin:0;z-index:1}
+  .hsw i{width:clamp(100px,9.6vw,132px);height:clamp(134px,18vh,158px)}
+}
+.hero__scroll{
+  position:absolute;left:var(--gut);bottom:clamp(24px,4vh,44px);
+  display:flex;align-items:center;gap:.7em;font-family:var(--mono);font-weight:400;
+  font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);
+}
+.hero__scroll i{width:30px;height:1px;background:var(--line-2);position:relative;overflow:hidden;display:block}
+.hero__scroll i::after{content:"";position:absolute;inset:0;width:40%;background:var(--ink);animation:slide 2.4s var(--ease) infinite}
+@keyframes slide{0%{transform:translateX(-100%)}60%,100%{transform:translateX(260%)}}
+
+/* ============================================================
+   STACK - sticky palette cards that pile up on scroll
+   ============================================================ */
+.stack{position:relative;padding:0 var(--gut) 10vh}
+.pcard{
+  position:sticky;top:calc(var(--stick) + var(--i) * 11px);
+  height:clamp(540px,82vh,840px);margin:0 0 9vh;
+  border-radius:30px;overflow:hidden;
+  background:var(--bg);color:var(--fg);
+  transform-origin:top center;will-change:transform,filter;
+  box-shadow:0 30px 70px -50px rgba(22,21,27,.7);
+  display:flex;flex-direction:column;
+  padding:clamp(26px,3.4vw,58px);
+}
+.pcard .eyebrow,.pcard .mono{color:var(--fg2)}
+.pcard__top{display:flex;align-items:baseline;justify-content:space-between;gap:1em}
+.pcard__idx{font-family:var(--mono);font-weight:300;font-size:.74rem;letter-spacing:.12em;color:var(--fg2)}
+.pcard__title{
+  margin-top:clamp(6px,1vw,12px);
+  font-weight:700;letter-spacing:-.045em;line-height:.84;
+  font-size:clamp(3rem,8.5vw,8rem);
+}
+.pcard__title span{display:block}
+.pcard__title .dim{color:var(--fg2)}
+.pcard__desc{
+  margin-top:auto;max-width:42ch;
+  font-weight:500;font-size:clamp(1rem,1.5vw,1.32rem);line-height:1.4;color:var(--fg);
+  letter-spacing:-.01em;opacity:.92;
+}
+/* the row of colour tiles - each is a copy button */
+.tiles{
+  margin-top:clamp(18px,2.2vw,28px);
+  display:grid;grid-template-columns:repeat(5,1fr);gap:clamp(8px,.9vw,14px);
+}
+.tile{
+  position:relative;display:flex;flex-direction:column;justify-content:space-between;
+  height:clamp(96px,15vh,168px);padding:clamp(10px,1vw,16px);
+  border:none;border-radius:16px;cursor:pointer;text-align:left;overflow:hidden;
+  background:var(--c);color:var(--tc);font-family:var(--mono);
+  box-shadow:inset 0 0 0 1px var(--tline);
+  transition:box-shadow .4s var(--ease);
+}
+/* each card highlights its tiles in its own palette accent - a self-contained theme */
+.tile:hover{box-shadow:inset 0 0 0 1px var(--tline),inset 0 0 0 3px var(--accent)}
+.tile.is-copied{box-shadow:inset 0 0 0 1px var(--tline),inset 0 0 0 3px var(--accent)}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.tile__name{font-weight:400;font-size:.76rem;letter-spacing:.01em;opacity:.92;line-height:1.18}
+.tile__hex{position:relative;display:grid;font-weight:300;font-size:.84rem;letter-spacing:.08em}
+.tile__hex span{grid-area:1/1;transition:opacity .35s var(--ease),transform .35s var(--ease)}
+.tile__hex .d{opacity:0;transform:translateY(45%)}
+.tile.is-copied .tile__hex .h{opacity:0;transform:translateY(-45%)}
+.tile.is-copied .tile__hex .d{opacity:1;transform:translateY(0)}
+/* hover-capable devices: name sits alone until you hover, then the hex animates in.
+   touch devices (no hover) keep the hex visible since there's nothing to hover. */
+@media (hover:hover){
+  .tile__hex .h{opacity:0;transform:translateY(45%)}
+  .tile:hover .tile__hex .h{opacity:1;transform:translateY(0)}
+  .tile.is-copied .tile__hex .h{opacity:0;transform:translateY(-45%)}
+}
+.pcard__foot{
+  margin-top:clamp(14px,1.6vw,20px);display:flex;align-items:center;gap:.6em;
+  font-family:var(--mono);font-weight:300;font-size:.72rem;color:var(--fg2);
+}
+.pcard__foot .ast{font-size:1.1em;line-height:0}
+
+@media (max-width:760px){
+  .pcard{height:clamp(520px,86vh,760px)}
+  .tiles{grid-template-columns:repeat(5,1fr);gap:6px}
+  .tile{height:clamp(74px,11vh,120px);padding:8px;border-radius:12px}
+  .tile__name{font-size:.6rem;opacity:.85}
+  .tile__hex{font-size:.64rem}
+  .pcard__desc{font-size:1rem;max-width:none}
+}
+
+/* ============================================================
+   GRID - the remaining nine palettes, after the stack
+   ============================================================ */
+.grid-sec{position:relative;z-index:1;padding:6vh var(--gut) 12vh}
+.grid-sec__head{margin-bottom:clamp(22px,3.6vh,52px)}
+.grid-sec__head .eyebrow{margin-bottom:clamp(12px,1.5vw,20px)}
+.grid-sec__head h2{font-weight:700;letter-spacing:-.04em;line-height:.86;font-size:clamp(2.6rem,7vw,5.5rem)}
+.grid-sec__head h2 .tail{color:var(--dim)}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,1.4vw,22px)}
+.gcard{
+  background:var(--bg);color:var(--fg);border-radius:24px;overflow:hidden;
+  padding:clamp(22px,1.8vw,34px);display:flex;flex-direction:column;min-height:clamp(360px,46vh,520px);
+  box-shadow:0 24px 56px -42px rgba(22,21,27,.6);
+}
+.gcard .eyebrow,.gcard .pcard__idx{color:var(--fg2)}
+.gcard__name{margin-top:clamp(8px,.9vw,14px);font-weight:700;letter-spacing:-.03em;line-height:.9;font-size:clamp(2rem,2.7vw,3.1rem)}
+.gcard__name span{display:block}
+.gcard__name .dim{color:var(--fg2)}
+.gcard__desc{margin-top:.75em;font-size:clamp(.95rem,1vw,1.1rem);line-height:1.42;color:var(--fg);opacity:.82;max-width:36ch}
+.gcard .tiles{margin-top:auto;padding-top:clamp(18px,1.7vw,28px);gap:clamp(7px,.6vw,11px)}
+.gcard .tile{height:clamp(84px,11vh,148px);padding:clamp(10px,.8vw,15px);border-radius:15px}
+.gcard .tile__hex{font-size:clamp(.72rem,.78vw,.84rem)}
+@media (max-width:900px){.pgrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:600px){.pgrid{grid-template-columns:1fr}.gcard{min-height:0}.gcard .tile{height:clamp(74px,11vh,120px)}}
+
+/* ============================================================
+   BUILDER - interactive colour-theory palette generator
+   ============================================================ */
+.builder{position:relative;z-index:1;padding:2vh var(--gut) 14vh}
+.builder__head{margin-bottom:clamp(22px,3.6vh,52px)}
+.builder__head .eyebrow{margin-bottom:clamp(12px,1.5vw,20px)}
+.builder__head h2{font-weight:700;letter-spacing:-.04em;line-height:.86;font-size:clamp(2.6rem,7vw,5.5rem)}
+.builder__head h2 .tail{color:var(--dim)}
+.builder__sub{margin-top:clamp(12px,1.6vw,20px);color:var(--ink-2);font-size:clamp(1rem,1.4vw,1.22rem);line-height:1.4;max-width:48ch}
+
+.builder__panel{
+  background:#14131A;color:#F4F1EA;border-radius:28px;overflow:hidden;
+  box-shadow:0 30px 70px -50px rgba(22,21,27,.8);
+}
+.builder__swatches{display:grid;grid-template-columns:repeat(5,1fr)}
+.bswatch-wrap{position:relative;display:flex}
+.bswatch{
+  position:relative;border:none;cursor:pointer;text-align:left;width:100%;
+  height:clamp(200px,34vh,380px);display:flex;align-items:flex-end;
+  padding:clamp(14px,1.4vw,22px);font-family:var(--mono);
+  transition:background-color .55s var(--ease),color .55s var(--ease);
+}
+.bswatch__hex{position:relative;display:grid;font-weight:300;font-size:clamp(.82rem,1vw,1.05rem);letter-spacing:.08em}
+.bswatch__hex span{grid-area:1/1;transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.bswatch__hex .d{opacity:0;transform:translateY(55%)}
+.bswatch.is-copied .bswatch__hex .h{opacity:0;transform:translateY(-55%)}
+.bswatch.is-copied .bswatch__hex .d{opacity:1;transform:translateY(0)}
+.bswatch:focus-visible{outline:3px solid #fff;outline-offset:-4px}
+.bswatch__lock{position:absolute;top:clamp(9px,1vw,15px);right:clamp(9px,1vw,15px);z-index:2;width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;padding:0;display:grid;place-items:center;color:#fff;background:rgba(10,10,12,.34);opacity:0;transform:scale(.86);transition:opacity .22s var(--ease),transform .22s var(--ease),background .22s var(--ease),color .22s var(--ease)}
+.bswatch__lock svg{width:15px;height:15px;display:block}
+.bswatch__lock .lk-shut{display:none}
+.bswatch__lock.is-locked .lk-open{display:none}
+.bswatch__lock.is-locked .lk-shut{display:block}
+.bswatch-wrap:hover .bswatch__lock,.bswatch__lock:focus-visible{opacity:1;transform:scale(1)}
+.bswatch__lock:hover{background:rgba(10,10,12,.52)}
+.bswatch__lock.is-locked{opacity:1;transform:scale(1);background:#fff;color:#14131A}
+@media (hover:none){.bswatch__lock{opacity:1;transform:scale(1)}}
+
+.builder__controls{padding:clamp(20px,2.4vw,36px);display:flex;flex-direction:column;gap:clamp(18px,2.2vw,30px);border-top:1px solid rgba(255,255,255,.08)}
+.builder__row{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;flex-wrap:wrap}
+
+.seg{display:flex;flex-wrap:wrap;gap:5px;background:rgba(255,255,255,.06);padding:5px;border-radius:999px}
+.seg button{
+  border:none;background:transparent;color:rgba(244,241,234,.65);cursor:pointer;
+  font-family:var(--mono);font-weight:300;font-size:.74rem;letter-spacing:.02em;
+  padding:.62em 1.05em;border-radius:999px;transition:background .3s var(--ease),color .3s var(--ease);
+}
+.seg button:hover{color:#fff}
+.seg button[aria-pressed="true"]{background:#F4F1EA;color:#14131A;font-weight:400}
+
+.basepick{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.basepick__lbl{font-family:var(--mono);font-weight:300;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,241,234,.6)}
+#bPick{-webkit-appearance:none;appearance:none;width:clamp(42px,3.4vw,54px);height:clamp(42px,3.4vw,54px);border:none;border-radius:50%;padding:0;cursor:pointer;background:transparent;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.45)}
+#bPick::-webkit-color-swatch-wrapper{padding:0}
+#bPick::-webkit-color-swatch{border:none;border-radius:50%}
+#bPick::-moz-color-swatch{border:none;border-radius:50%}
+#bPick:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.basepick__hex{display:flex;align-items:center;gap:.15em;background:rgba(255,255,255,.08);border-radius:12px;padding:.7em .95em;transition:background .3s var(--ease)}
+.basepick__hex:focus-within{background:rgba(255,255,255,.14)}
+.basepick__hex>span{font-family:var(--mono);font-weight:300;color:rgba(244,241,234,.45)}
+#bHex{background:transparent;border:none;outline:none;color:#F4F1EA;font-family:var(--mono);font-weight:300;font-size:.92rem;letter-spacing:.1em;width:7ch;text-transform:uppercase}
+
+.builder__actions{display:flex;gap:10px}
+.btn{
+  border:none;cursor:pointer;font-family:var(--mono);font-weight:400;font-size:.78rem;letter-spacing:.02em;
+  padding:.85em 1.5em;border-radius:999px;background:#F4F1EA;color:#14131A;
+  transition:transform .25s var(--ease),background .3s var(--ease);
+}
+.btn:hover{background:#fff}
+.btn:active{transform:scale(.96)}
+.btn--ghost{background:rgba(255,255,255,.08);color:#F4F1EA}
+.btn--ghost:hover{background:rgba(255,255,255,.16)}
+.btn:focus-visible{outline:2px solid #fff;outline-offset:3px}
+
+.builder__sliders{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,40px)}
+.sld{display:flex;flex-direction:column;gap:.7em}
+.sld>span{font-family:var(--mono);font-weight:300;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,241,234,.6);display:flex;justify-content:space-between;align-items:baseline}
+.sld>span b{font-weight:400;color:#F4F1EA;letter-spacing:.04em}
+.bslider{appearance:none;-webkit-appearance:none;width:100%;height:10px;border-radius:999px;outline:none;cursor:pointer;background:rgba(255,255,255,.12)}
+#sH{background:linear-gradient(90deg,hsl(0,85%,55%),hsl(60,85%,55%),hsl(120,85%,55%),hsl(180,85%,55%),hsl(240,85%,55%),hsl(300,85%,55%),hsl(360,85%,55%))}
+.bslider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 9px rgba(0,0,0,.5),inset 0 0 0 2px rgba(0,0,0,.12);cursor:grab}
+.bslider:active::-webkit-slider-thumb{cursor:grabbing}
+.bslider::-moz-range-thumb{width:22px;height:22px;border:none;border-radius:50%;background:#fff;box-shadow:0 2px 9px rgba(0,0,0,.5);cursor:grab}
+.bslider:focus-visible{box-shadow:0 0 0 3px rgba(255,255,255,.4)}
+
+.builder__export{border-top:1px solid rgba(255,255,255,.08);margin-top:clamp(4px,.6vw,8px);padding-top:clamp(20px,2.4vw,30px);display:flex;flex-direction:column;gap:clamp(12px,1.4vw,18px)}
+.export__lbl{font-family:var(--mono);font-weight:300;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,241,234,.65)}
+.export__lbl span{opacity:.55}
+.export__fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.exfield,.exname{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:12px;
+  color:#F4F1EA;font-family:var(--mono);font-weight:300;font-size:.84rem;letter-spacing:.02em;
+  padding:.8em 1em;outline:none;transition:border-color .3s var(--ease),background .3s var(--ease);width:100%;
+}
+.exfield::placeholder,.exname::placeholder{color:rgba(244,241,234,.34)}
+.exfield:focus,.exname:focus{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.1)}
+.export__names{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.exname{font-size:.76rem;padding:.7em .8em}
+.export__actions{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:2px}
+.export__hint{font-family:var(--mono);font-weight:300;font-size:.72rem;color:rgba(244,241,234,.5);margin:0}
+.export__hint b{color:rgba(244,241,234,.82);font-weight:400}
+.export__btns{display:flex;gap:10px;flex-wrap:wrap}
+
+/* contrast / WCAG checker */
+.builder__contrast{border-top:1px solid rgba(255,255,255,.08);padding-top:clamp(20px,2.4vw,30px);display:flex;flex-direction:column;gap:clamp(12px,1.4vw,18px)}
+.contrast__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:clamp(14px,1.6vw,24px);align-items:stretch}
+.contrast__preview{border-radius:16px;padding:clamp(18px,2vw,30px);display:flex;flex-direction:column;justify-content:center;gap:.35em;min-height:138px;overflow:hidden;transition:background-color .45s var(--ease),color .45s var(--ease)}
+.cprev__big{font-family:var(--display);font-weight:700;font-size:clamp(2.4rem,4vw,3.4rem);letter-spacing:-.03em;line-height:1}
+.cprev__small{font-family:var(--display);font-weight:500;font-size:clamp(.9rem,1.2vw,1.15rem);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contrast__panel{display:flex;flex-direction:column;justify-content:space-between;gap:16px}
+.contrast__top{display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap}
+.contrast__ratio{display:flex;align-items:baseline;gap:.15em;color:#F4F1EA}
+.contrast__ratio b{font-family:var(--display);font-weight:700;font-size:clamp(2rem,3.4vw,3rem);letter-spacing:-.03em}
+.contrast__ratio span{font-family:var(--mono);font-weight:300;font-size:.8rem;color:rgba(244,241,234,.5)}
+.contrast__badges{display:flex;gap:6px;flex-wrap:wrap}
+.cbadge{font-family:var(--mono);font-weight:300;font-size:.66rem;letter-spacing:.05em;padding:.42em .72em;border-radius:99px;background:rgba(255,255,255,.07);color:rgba(244,241,234,.4);display:inline-flex;gap:.4em;align-items:center}
+.cbadge::before{content:"✗";opacity:.8}
+.cbadge.pass{background:rgba(120,210,150,.16);color:#9be3b4}
+.cbadge.pass::before{content:"✓"}
+.contrast__pick{display:flex;flex-direction:column;gap:9px}
+.cpick{display:flex;align-items:center;gap:12px}
+.cpick>span{font-family:var(--mono);font-weight:300;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(244,241,234,.5);width:3em;flex:none}
+.cchips{display:flex;gap:7px}
+.cchip{width:32px;height:32px;border-radius:9px;border:none;cursor:pointer;padding:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+.cchip[aria-pressed="true"]{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 0 0 2px #F4F1EA}
+.cchip:hover{transform:translateY(-1px)}
+@media (max-width:760px){.contrast__grid{grid-template-columns:1fr}}
+
+@media (max-width:760px){
+  .bswatch{height:clamp(120px,20vh,200px);padding:10px}
+  .bswatch__hex{font-size:.62rem}
+  .builder__sliders{grid-template-columns:1fr;gap:18px}
+  .builder__row{flex-direction:column;align-items:stretch}
+  .builder__actions{justify-content:space-between}
+  .builder__actions .btn{flex:1}
+  .export__fields{grid-template-columns:1fr}
+  .export__names{gap:6px}
+  .exname{padding:.55em .35em;font-size:.62rem;text-align:center}
+  .export__actions{flex-direction:column;align-items:stretch}
+  .export__btns{display:grid;grid-template-columns:repeat(3,1fr)}
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+/* ---- FAQ: rows that breathe open, mirroring the archive accordion ---- */
+.faq{position:relative;z-index:1;border-top:1px solid var(--line);
+  padding:clamp(4rem,11vh,8.5rem) var(--gut) clamp(4.5rem,13vh,9rem)}
+.faq__head{display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem 2rem;flex-wrap:wrap;
+  margin-bottom:clamp(1.8rem,5vh,3.4rem)}
+.faq__head h2{font-weight:700;letter-spacing:-.04em;line-height:.88;font-size:clamp(2.4rem,6.4vw,5rem)}
+.faq__head h2 .tail{color:var(--dim)}
+.faq__head .eyebrow{align-self:flex-end}
+.faqx{border-top:1px solid var(--line)}
+.faqx:last-child{border-bottom:1px solid var(--line)}
+.frow{width:100%;background:none;border:0;cursor:pointer;text-align:left;color:var(--ink);font:inherit;
+  display:grid;grid-template-columns:3.2rem 1fr auto;align-items:center;gap:1.2rem;
+  padding:clamp(1.15rem,2.5vh,1.7rem) .35rem;
+  transition:padding-left .5s var(--ease),background .4s var(--ease)}
+.frow:hover{background:var(--bg-2);padding-left:1.1rem}
+.faqx.open .frow{background:var(--bg-2)}
+.frow__num{font-family:var(--mono);font-weight:300;font-size:.62rem;letter-spacing:.16em;color:var(--dim);transition:color .3s}
+.frow:hover .frow__num,.faqx.open .frow__num{color:var(--ink)}
+.frow__q{font-family:var(--display);font-weight:600;font-size:clamp(1.04rem,2vw,1.5rem);letter-spacing:-.02em;line-height:1.15}
+.frow__ico{position:relative;width:17px;height:17px;flex:none;margin-right:.2rem}
+.frow__ico::before,.frow__ico::after{content:"";position:absolute;background:var(--ink-2);border-radius:2px;
+  transition:transform .5s var(--ease),opacity .35s var(--ease)}
+.frow__ico::before{top:50%;left:0;right:0;height:2px;transform:translateY(-50%)}
+.frow__ico::after{left:50%;top:0;bottom:0;width:2px;transform:translateX(-50%)}
+.faqx.open .frow__ico::after{transform:translateX(-50%) scaleY(0);opacity:0}
+.frow__detail{display:grid;grid-template-rows:0fr;transition:grid-template-rows .65s var(--ease)}
+.faqx.open .frow__detail{grid-template-rows:1fr}
+.frow__detail > div{overflow:hidden}
+.frow__a{max-width:62ch;color:var(--mut);font-size:clamp(.98rem,1.3vw,1.12rem);line-height:1.72;
+  padding:.2rem .35rem clamp(1.4rem,3vh,2.1rem) calc(3.2rem + 1.2rem)}
+.frow__a a{border-bottom:1px solid var(--line-2);transition:border-color .3s}
+.frow__a a:hover{border-color:var(--ink)}
+.frow__a b{color:var(--ink-2);font-weight:600}
+@media (max-width:620px){.frow{grid-template-columns:2.3rem 1fr auto;gap:.8rem}.frow__a{padding-left:.35rem}}
+
+/* ============================================================
+   FOOTER REVEAL - engineering flex + a giant ink-filling wordmark
+   ============================================================ */
+.foot{
+  position:relative;z-index:1;border-top:1px solid var(--line);overflow:hidden;
+  min-height:90vh;display:flex;flex-direction:column;justify-content:space-between;
+  padding:clamp(3.5rem,8vh,6.5rem) var(--gut) clamp(1.8rem,4vh,2.8rem);
+}
+.foot__top{display:flex;justify-content:space-between;align-items:flex-start;gap:2rem 3rem;flex-wrap:wrap}
+.foot__lead .eyebrow{margin-bottom:clamp(14px,2vh,22px)}
+.foot__cta{
+  display:inline-flex;align-items:center;gap:.7em;text-decoration:none;
+  font-weight:700;letter-spacing:-.02em;font-size:clamp(1.4rem,3.4vw,2.4rem);line-height:1;color:var(--ink);
+}
+.foot__cta svg{width:.78em;height:.78em;transition:transform .5s var(--ease)}
+.foot__cta:hover svg{transform:translate(4px,-4px)}
+.foot__free{margin-top:clamp(10px,1.4vh,16px);color:var(--mut);font-size:.95rem;max-width:26ch;line-height:1.5}
+.foot__stats{font-family:var(--mono);font-weight:300;font-size:.74rem;color:var(--mut);line-height:2;text-align:right;list-style:none}
+.foot__stats b{color:var(--ink-2);font-weight:400}
+.foot__word{
+  --fill:0%;display:inline-flex;align-items:baseline;align-self:center;text-decoration:none;
+  margin:clamp(2rem,5vh,4rem) 0;
+  font-weight:700;letter-spacing:-.055em;line-height:.74;font-size:clamp(5rem,27vw,26rem);
+}
+.foot__ink{
+  color:transparent;
+  background-image:linear-gradient(90deg,var(--ink),var(--ink)),linear-gradient(90deg,var(--line-2),var(--line-2));
+  background-repeat:no-repeat;background-position:left center;
+  background-size:var(--fill) 100%, 100% 100%;
+  -webkit-background-clip:text;background-clip:text;
+}
+.foot__word .tail{color:var(--dim);-webkit-text-stroke:0}
+.foot__base{display:flex;justify-content:space-between;align-items:baseline;gap:1rem 1.5rem;flex-wrap:wrap;
+  font-family:var(--mono);font-weight:300;font-size:.7rem;letter-spacing:.03em;color:var(--mut)}
+.foot__base b{color:var(--ink-2);font-weight:400}
+.foot__base svg{width:1.05em;height:1.05em;vertical-align:-.16em;margin:0 .14em}
+.foot__base a{color:var(--ink-2);border-bottom:1px solid var(--line-2);transition:border-color .3s var(--ease)}
+.foot__base a:hover{border-color:var(--ink)}
+.foot__br{content:"";display:block;margin-bottom:.5em}
+body.is-static .foot__word{--fill:120%}
+@media (max-width:620px){.foot__stats{text-align:left}.foot{min-height:80vh}}
+
+.ns{padding:4vh var(--gut) 10vh}
+.ns li{list-style:none;padding:1rem 0;border-top:1px solid var(--line)}
+.ns b{font-weight:600;font-size:1.2rem;letter-spacing:-.02em}
+.ns code{font-family:var(--mono);font-size:.78rem;color:var(--mut)}
+
+/* ============================================================
+   REDUCED MOTION / STATIC - unstick the cards into a plain list
+   ============================================================ */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+  .pcard{position:static;height:auto;min-height:0;transform:none !important;filter:none !important;margin-bottom:5vh}
+  #amb{display:none}
+}
+body.is-static .pcard{position:static;height:auto;transform:none !important;filter:none !important;margin-bottom:5vh}
+body.is-static #amb{display:none}
+</style>
+</head>
+<body>
+
+<canvas id="amb" aria-hidden="true"></canvas>
+
+<nav class="nav" id="nav" aria-label="Primary">
+  <a class="nav__item nav__brand" href="#top" data-target="top">swatch</a>
+  <span class="nav__div" aria-hidden="true"></span>
+  <a class="nav__item" href="#stack" data-target="stack">explore</a>
+  <span class="nav__div" aria-hidden="true"></span>
+  <a class="nav__item" href="#build" data-target="build">build</a>
+</nav>
+
+<main>
+  <!-- HERO -->
+  <section class="hero" id="top" aria-label="Introduction">
+    <div class="hero__swatches" aria-hidden="true">
+      <span class="hsw" style="--c:#181513"><i></i><b>181513</b></span>
+      <span class="hsw" style="--c:#E2664F"><i></i><b>E2664F</b></span>
+      <span class="hsw" style="--c:#F0A18C"><i></i><b>F0A18C</b></span>
+      <span class="hsw" style="--c:#DAD3CB"><i></i><b>DAD3CB</b></span>
+      <span class="hsw" style="--c:#FBF4EF"><i></i><b>FBF4EF</b></span>
+    </div>
+    <p class="eyebrow hero__eyebrow">Colour palette studio</p>
+    <h1>Swatch<span class="tail">.</span></h1>
+    <p class="hero__lead">Browse a curated set, build your own with colour theory, then export it anywhere.</p>
+    <p class="hero__scroll"><i></i> Scroll to explore</p>
+  </section>
+
+  <!-- STACK: first three palettes as stacking cards (rendered by JS) -->
+  <section class="stack" id="stack" aria-label="Featured palettes"></section>
+
+  <!-- GRID: the remaining nine palettes (rendered by JS) -->
+  <section class="grid-sec" aria-label="More palettes">
+    <div class="grid-sec__head">
+      <p class="eyebrow">The rest of the set</p>
+      <h2>Nine more<span class="tail">.</span></h2>
+    </div>
+    <div class="pgrid" id="pgrid"></div>
+  </section>
+
+  <!-- BUILDER: interactive colour-theory palette generator -->
+  <section class="builder" id="build" aria-label="Swatch builder">
+    <div class="builder__head">
+      <p class="eyebrow">Inspired?</p>
+      <h2>Swatch builder<span class="tail">.</span></h2>
+      <p class="builder__sub">Pick a base, choose a colour-theory harmony, and shape a palette. Click any swatch to copy it, or grab the whole set as CSS.</p>
+    </div>
+    <div class="builder__panel">
+      <div class="builder__swatches" id="bswatches"></div>
+      <div class="builder__controls">
+        <div class="builder__row">
+          <div class="basepick">
+            <span class="basepick__lbl">Start with</span>
+            <input type="color" id="bPick" aria-label="Pick a base colour from the wheel" />
+            <div class="basepick__hex"><span aria-hidden="true">#</span><input type="text" id="bHex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Base hex code" /></div>
+          </div>
+          <div class="builder__actions">
+            <button class="btn" id="bShuffle" type="button">Shuffle</button>
+            <button class="btn btn--ghost" id="bShare" type="button">Share</button>
+            <button class="btn btn--ghost" id="bCopy" type="button">Copy CSS</button>
+          </div>
+        </div>
+        <div class="seg" id="harmony" role="group" aria-label="Colour harmony"></div>
+        <div class="builder__sliders">
+          <label class="sld"><span>Hue <b id="vH"></b></span><input class="bslider" id="sH" type="range" min="0" max="360" aria-label="Base hue" /></label>
+          <label class="sld"><span>Saturation <b id="vS"></b></span><input class="bslider" id="sS" type="range" min="0" max="100" aria-label="Base saturation" /></label>
+          <label class="sld"><span>Lightness <b id="vL"></b></span><input class="bslider" id="sL" type="range" min="12" max="88" aria-label="Base lightness" /></label>
+        </div>
+        <div class="builder__contrast">
+          <p class="export__lbl">Contrast <span>WCAG AA / AAA, for real UI use</span></p>
+          <div class="contrast__grid">
+            <div class="contrast__preview" id="cPrev">
+              <span class="cprev__big">Aa</span>
+              <span class="cprev__small">The quick brown fox jumps</span>
+            </div>
+            <div class="contrast__panel">
+              <div class="contrast__top">
+                <div class="contrast__ratio"><b id="cRatio">--</b><span>: 1</span></div>
+                <div class="contrast__badges" id="cBadges"></div>
+              </div>
+              <div class="contrast__pick">
+                <div class="cpick"><span>Text</span><div class="cchips" id="cFgChips"></div></div>
+                <div class="cpick"><span>On</span><div class="cchips" id="cBgChips"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="builder__export">
+          <p class="export__lbl">Export a card <span>for decks, moodboards &amp; docs</span></p>
+          <div class="export__fields">
+            <input class="exfield" id="exName" type="text" placeholder="Palette name (optional)" autocomplete="off" />
+            <input class="exfield" id="exLabel" type="text" placeholder="Label · e.g. Brand / Primary (optional)" autocomplete="off" />
+            <input class="exfield" id="exDesc" type="text" placeholder="Short description (optional)" autocomplete="off" />
+          </div>
+          <div class="export__names" id="exNames" role="group" aria-label="Swatch names (optional)"></div>
+          <div class="export__actions">
+            <p class="export__hint">PNG &amp; SVG carry a small <b>tryswatch.com</b> mark.</p>
+            <div class="export__btns">
+              <button class="btn" id="exPng" type="button">PNG</button>
+              <button class="btn btn--ghost" id="exSvg" type="button">SVG</button>
+              <button class="btn btn--ghost" id="exTw" type="button">Tailwind</button>
+              <button class="btn btn--ghost" id="exJson" type="button">JSON</button>
+              <button class="btn btn--ghost" id="exAse" type="button">.ase</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ: archive-styled rows that breathe open -->
+  <section class="faq" aria-label="Questions">
+    <div class="faq__head">
+      <h2>Questions<span class="tail">.</span></h2>
+      <p class="eyebrow">Good to know</p>
+    </div>
+    <div class="faq__list">
+      <div class="faqx">
+        <button class="frow" type="button" aria-expanded="false">
+          <span class="frow__num">01</span>
+          <span class="frow__q">Is Swatch free?</span>
+          <span class="frow__ico" aria-hidden="true"></span>
+        </button>
+        <div class="frow__detail"><div><p class="frow__a">Completely. Build palettes, copy colours and export as much as you like, and the colours are yours to use however you want, commercial work included. If it earns a spot in your workflow, there's a <a href="https://ko-fi.com/larshdev" target="_blank" rel="noopener">tip jar</a> &mdash; entirely optional.</p></div></div>
+      </div>
+      <div class="faqx">
+        <button class="frow" type="button" aria-expanded="false">
+          <span class="frow__num">02</span>
+          <span class="frow__q">What&rsquo;s the colour theory under the hood?</span>
+          <span class="frow__ico" aria-hidden="true"></span>
+        </button>
+        <div class="frow__detail"><div><p class="frow__a">Pick a base and the builder generates real harmonies (<b>complementary, analogous, triadic, split-complementary</b> and more), then balances lightness into five usable steps from ink to paper. Lock any swatch to pin it while the rest re-harmonise around it.</p></div></div>
+      </div>
+      <div class="faqx">
+        <button class="frow" type="button" aria-expanded="false">
+          <span class="frow__num">03</span>
+          <span class="frow__q">Are the palettes accessible?</span>
+          <span class="frow__ico" aria-hidden="true"></span>
+        </button>
+        <div class="frow__detail"><div><p class="frow__a">Every build ships a live <b>WCAG contrast checker</b>. Pair any two swatches and it shows the exact ratio with AA / AAA pass marks, so the colours you actually ship are legible, not just pretty.</p></div></div>
+      </div>
+      <div class="faqx">
+        <button class="frow" type="button" aria-expanded="false">
+          <span class="frow__num">04</span>
+          <span class="frow__q">What can I export?</span>
+          <span class="frow__ico" aria-hidden="true"></span>
+        </button>
+        <div class="frow__detail"><div><p class="frow__a">A polished <b>PNG</b> or <b>SVG</b> card for decks and moodboards, plus <b>Tailwind</b> config, <b>JSON</b> tokens, and an Adobe <b>.ase</b> swatch file. Drop them straight into a codebase or your design tool. Click any swatch to copy its hex on its own.</p></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot" aria-label="Footer">
+  <div class="foot__top">
+    <div class="foot__lead">
+      <a class="foot__cta" href="#build">Build a palette
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+      </a>
+      <p class="foot__free">Pick a base, choose a harmony, export the set. No account, ever.</p>
+    </div>
+  </div>
+  <a class="foot__word" href="#top" aria-label="Swatch, back to top"><span class="foot__ink">swatch</span><span class="tail">.</span></a>
+  <div class="foot__base">
+    <span><b>tryswatch.com</b> · colour palette studio<br class="foot__br"><a href="privacy/">Privacy</a> · <a href="terms/">Terms of Use</a> · <a class="js-mail" data-u="hello" data-d="tryswatch.com">Contact</a></span>
+    <span>Built with <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208 80h-12.78A24 24 0 0 0 192 64H32a16 16 0 0 0-16 16v56a72.08 72.08 0 0 0 72 72h64a72.08 72.08 0 0 0 71.34-64H208a40 40 0 0 0 0-80zm-32 56a56.06 56.06 0 0 1-56 56H88a56.06 56.06 0 0 1-56-56V80h144zm32 8h-16V96h16a24 24 0 0 1 0 48z"/></svg> in Melbourne by <a href="https://larsh.dev">larsh.dev</a> · <span id="yr">2026</span><br class="foot__br">Enjoying Swatch? <a href="https://ko-fi.com/larshdev" target="_blank" rel="noopener">Leave a tip ↗</a></span>
+  </div>
+</footer>
+
+<noscript>
+  <ul class="ns" aria-label="All palettes">
+    <li><b>Graphite Bloom</b>: <code>#0E0E10 #2B2B30 #C9A9A6 #E9D5D0 #F4EEEA</code></li>
+    <li><b>Verdigris</b>: <code>#0C1B1A #2E5D58 #6FA39B #B9D6CF #EFF4F1</code></li>
+    <li><b>Saffron Static</b>: <code>#131210 #C9742E #E0A23B #F0E2C4 #FBF7EE</code></li>
+    <li><b>Lilac Hour</b>: <code>#1A1622 #6C5A8C #B7A6D9 #E4D9F0 #F6F2FB</code></li>
+    <li><b>Moss Code</b>: <code>#14160F #3C4A2A #7E8C53 #C3CBA1 #EDEFE2</code></li>
+    <li><b>Coral Concrete</b>: <code>#181513 #E2664F #F0A18C #DAD3CB #FBF4EF</code></li>
+    <li><b>Indigo Depths</b>: <code>#0A0E1A #1E2A52 #4A5DA8 #A7B4DE #ECEFF7</code></li>
+    <li><b>Terracotta Sun</b>: <code>#1C1410 #B5532E #D98C5F #E9C6A4 #F8EEE2</code></li>
+    <li><b>Mint Slate</b>: <code>#11181A #2F6E63 #8FD3C1 #CFEAE0 #F1F8F5</code></li>
+    <li><b>Ember Noir</b>: <code>#0D0B0B #5C1A1A #B23A2E #E4A79A #F4ECEA</code></li>
+    <li><b>Butter &amp; Ink</b>: <code>#15140E #4A4632 #E7CE6B #F2E6A8 #FAF6E6</code></li>
+    <li><b>Petrol Dusk</b>: <code>#0B1417 #1F3C42 #C2603B #9DB5B5 #E8EEED</code></li>
+  </ul>
+</noscript>
+
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script src="vendor/lenis.min.js"></script>
+<script src="vendor/three.min.js"></script>
+<script>
+/* ============================================================
+   DATA - twelve hand-tuned palettes
+   ============================================================ */
+var PALETTES = [
+  {id:'graphite-bloom', name:'Graphite Bloom', mood:'matte / monochrome',
+   description:'Cold graphite warmed by a breath of dusty rose. Restrained, but never austere.',
+   usage:'Editorial portfolios, fashion lookbooks, quiet luxury.',
+   colors:[{hex:'#0E0E10',name:'Obsidian'},{hex:'#2B2B30',name:'Slate'},{hex:'#C9A9A6',name:'Clay Rose'},{hex:'#E9D5D0',name:'Blush Dust'},{hex:'#F4EEEA',name:'Bone'}]},
+  {id:'verdigris', name:'Verdigris', mood:'pastel / oceanic',
+   description:'Aged copper greens cooling down into sea glass and frost. Calm with a patina of age.',
+   usage:'Wellness brands, maps, slow productivity apps.',
+   colors:[{hex:'#0C1B1A',name:'Deep Pine'},{hex:'#2E5D58',name:'Verdigris'},{hex:'#6FA39B',name:'Sea Glass'},{hex:'#B9D6CF',name:'Mist'},{hex:'#EFF4F1',name:'Frost'}]},
+  {id:'saffron-static', name:'Saffron Static', mood:'matte / warm',
+   description:'Carbon black struck through with toasted saffron. High contrast, low gloss.',
+   usage:'Coffee roasters, type specimens, bold editorial.',
+   colors:[{hex:'#131210',name:'Carbon'},{hex:'#C9742E',name:'Amber Burn'},{hex:'#E0A23B',name:'Saffron'},{hex:'#F0E2C4',name:'Oat'},{hex:'#FBF7EE',name:'Linen'}]},
+  {id:'lilac-hour', name:'Lilac Hour', mood:'pastel / dusk',
+   description:'The last violet light before night. Muted plum dissolving into lavender haze.',
+   usage:'Beauty, music, dreamy landing pages.',
+   colors:[{hex:'#1A1622',name:'Aubergine Night'},{hex:'#6C5A8C',name:'Muted Plum'},{hex:'#B7A6D9',name:'Lilac'},{hex:'#E4D9F0',name:'Wisteria'},{hex:'#F6F2FB',name:'Lavender Haze'}]},
+  {id:'moss-code', name:'Moss Code', mood:'matte / earthen',
+   description:'Forest ink through moss and olive to pale lichen. Grounded, organic, unhurried.',
+   usage:'Outdoor gear, ceramics, sustainability reports.',
+   colors:[{hex:'#14160F',name:'Forest Ink'},{hex:'#3C4A2A',name:'Moss'},{hex:'#7E8C53',name:'Olive'},{hex:'#C3CBA1',name:'Sage'},{hex:'#EDEFE2',name:'Pale Lichen'}]},
+  {id:'coral-concrete', name:'Coral Concrete', mood:'pastel / playful',
+   description:'A warm coral set against poured concrete. Soft heat on a neutral slab.',
+   usage:'Startups, event sites, friendly product UI.',
+   colors:[{hex:'#181513',name:'Char'},{hex:'#E2664F',name:'Coral'},{hex:'#F0A18C',name:'Salmon'},{hex:'#DAD3CB',name:'Concrete'},{hex:'#FBF4EF',name:'Shell'}]},
+  {id:'indigo-depths', name:'Indigo Depths', mood:'matte / nocturnal',
+   description:'Midnight pressed into indigo and cobalt, lifted by a sliver of periwinkle ice.',
+   usage:'Fintech, dashboards, sci-fi interfaces.',
+   colors:[{hex:'#0A0E1A',name:'Midnight'},{hex:'#1E2A52',name:'Indigo'},{hex:'#4A5DA8',name:'Cobalt'},{hex:'#A7B4DE',name:'Periwinkle'},{hex:'#ECEFF7',name:'Ice'}]},
+  {id:'terracotta-sun', name:'Terracotta Sun', mood:'pastel / desert',
+   description:'Sun-baked clay from roasted earth up to chalk. A warm adobe gradient.',
+   usage:'Travel, architecture, artisan goods.',
+   colors:[{hex:'#1C1410',name:'Roasted'},{hex:'#B5532E',name:'Terracotta'},{hex:'#D98C5F',name:'Adobe'},{hex:'#E9C6A4',name:'Sandstone'},{hex:'#F8EEE2',name:'Chalk'}]},
+  {id:'mint-slate', name:'Mint Slate', mood:'pastel / fresh',
+   description:'Cool mint floating over anthracite. Clean, modern, a little clinical in the best way.',
+   usage:'Health tech, finance apps, SaaS marketing.',
+   colors:[{hex:'#11181A',name:'Anthracite'},{hex:'#2F6E63',name:'Pine Mint'},{hex:'#8FD3C1',name:'Mint'},{hex:'#CFEAE0',name:'Seafoam'},{hex:'#F1F8F5',name:'Dew'}]},
+  {id:'ember-noir', name:'Ember Noir', mood:'matte / dramatic',
+   description:'Pitch black banked with oxblood and a glowing ember, fading to ash rose.',
+   usage:'Spirits, film, high-drama hero sections.',
+   colors:[{hex:'#0D0B0B',name:'Pitch'},{hex:'#5C1A1A',name:'Oxblood'},{hex:'#B23A2E',name:'Ember'},{hex:'#E4A79A',name:'Ash Rose'},{hex:'#F4ECEA',name:'Smoke'}]},
+  {id:'butter-ink', name:'Butter & Ink', mood:'pastel / sunny',
+   description:'Soft butter and custard over an inky base. Warm, optimistic, grown-up.',
+   usage:'Food brands, newsletters, playful editorial.',
+   colors:[{hex:'#15140E',name:'Ink'},{hex:'#4A4632',name:'Olive Drab'},{hex:'#E7CE6B',name:'Butter'},{hex:'#F2E6A8',name:'Custard'},{hex:'#FAF6E6',name:'Cream'}]},
+  {id:'petrol-dusk', name:'Petrol Dusk', mood:'matte / moody',
+   description:'Deep petrol teal cut by a single stroke of rust. Industrial, but atmospheric.',
+   usage:'Automotive, agencies, moody portfolios.',
+   colors:[{hex:'#0B1417',name:'Petrol'},{hex:'#1F3C42',name:'Deep Teal'},{hex:'#C2603B',name:'Rust'},{hex:'#9DB5B5',name:'Steam'},{hex:'#E8EEED',name:'Vapor'}]}
+];
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+var pad2 = function(n){ return (n < 10 ? '0' : '') + n; };
+var prefersReduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+var forceStatic = location.search.indexOf('static') > -1;
+var STACK_COUNT = 3;   // first N palettes stack on scroll; the rest go in the grid
+// don't let the browser restore a scroll position over a ?p=N deep link
+if('scrollRestoration' in history){ history.scrollRestoration = 'manual'; }
+
+// relative luminance → pick legible text on a given colour
+function isLight(hex){
+  var r = parseInt(hex.substr(1,2),16), g = parseInt(hex.substr(3,2),16), b = parseInt(hex.substr(5,2),16);
+  return (0.2126*r + 0.7152*g + 0.0722*b) / 255 > 0.55;
+}
+
+function copyHex(hex, el){
+  var done = function(){
+    el.classList.add('is-copied');
+    setTimeout(function(){ el.classList.remove('is-copied'); }, 1100);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(hex).then(done, done);
+  } else {
+    var t = document.createElement('textarea');
+    t.value = hex; document.body.appendChild(t); t.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(t); done();
+  }
+}
+
+// one colour tile = a copy button with name + hex
+function makeTile(col){
+  var hex = col.hex.toUpperCase();
+  var light = isLight(col.hex);
+  var tc = light ? '#1A1814' : '#FBFAF6';
+  var b = document.createElement('button');
+  b.className = 'tile';
+  b.type = 'button';
+  b.style.cssText = '--c:' + col.hex + ';--tc:' + tc +
+    ';--tline:' + (light ? 'rgba(20,18,14,.16)' : 'rgba(255,255,255,.16)');
+  b.setAttribute('aria-label', 'Copy ' + col.name + ' ' + hex);
+  b.innerHTML =
+    '<span class="tile__name">' + col.name + '</span>' +
+    '<span class="tile__hex"><span class="h">' + hex.slice(1) + '</span><span class="d" aria-hidden="true">Copied</span></span>';
+  b.addEventListener('click', function(){ copyHex(hex, b); });
+  return b;
+}
+
+/* ============================================================
+   BUILD THE STACK (first three palettes)
+   ============================================================ */
+(function buildStack(){
+  var stack = document.getElementById('stack');
+  var frag = document.createDocumentFragment();
+  PALETTES.slice(0, STACK_COUNT).forEach(function(p, i){
+    var c = p.colors;
+    var card = document.createElement('article');
+    card.className = 'pcard';
+    card.style.setProperty('--i', i);
+    card.style.setProperty('--bg', c[0].hex);
+    card.style.setProperty('--fg', c[4].hex);     // lightest: title & body
+    card.style.setProperty('--fg2', c[3].hex);    // light-mid: dim title, labels
+    card.style.setProperty('--accent', c[2].hex); // vivid mid: tile highlight theme
+    card.id = 'p' + (i + 1);
+
+    var words = p.name.split(' ');
+    var first = words.shift();
+    var rest = words.join(' ');
+    var title = '<span>' + first + '</span>' + (rest ? '<span class="dim">' + rest + '</span>' : '');
+
+    card.innerHTML =
+      '<div class="pcard__top">' +
+        '<span class="pcard__idx">' + pad2(i + 1) + ' / 12</span>' +
+        '<span class="eyebrow">' + p.mood + '</span>' +
+      '</div>' +
+      '<h2 class="pcard__title">' + title + '</h2>' +
+      '<p class="pcard__desc">' + p.description + '</p>';
+
+    var tiles = document.createElement('div');
+    tiles.className = 'tiles';
+    c.forEach(function(col){ tiles.appendChild(makeTile(col)); });
+    card.appendChild(tiles);
+
+    var foot = document.createElement('p');
+    foot.className = 'pcard__foot';
+    foot.innerHTML = '<span class="ast">&#10042;</span> Good for: ' + p.usage + ' &middot; click any colour to copy';
+    card.appendChild(foot);
+
+    frag.appendChild(card);
+  });
+  stack.appendChild(frag);
+})();
+
+/* ============================================================
+   BUILD THE GRID (remaining palettes)
+   ============================================================ */
+(function buildGrid(){
+  var grid = document.getElementById('pgrid');
+  var frag = document.createDocumentFragment();
+  PALETTES.slice(STACK_COUNT).forEach(function(p, j){
+    var gi = j + STACK_COUNT;      // global palette index
+    var c = p.colors;
+    var card = document.createElement('article');
+    card.className = 'gcard';
+    card.id = 'p' + (gi + 1);
+    card.style.setProperty('--bg', c[0].hex);
+    card.style.setProperty('--fg', c[4].hex);
+    card.style.setProperty('--fg2', c[3].hex);
+    card.style.setProperty('--accent', c[2].hex);
+
+    var words = p.name.split(' ');
+    var first = words.shift();
+    var rest = words.join(' ');
+    var title = '<span>' + first + '</span>' + (rest ? '<span class="dim">' + rest + '</span>' : '');
+
+    card.innerHTML =
+      '<div class="pcard__top">' +
+        '<span class="pcard__idx">' + pad2(gi + 1) + ' / 12</span>' +
+        '<span class="eyebrow">' + p.mood + '</span>' +
+      '</div>' +
+      '<h3 class="gcard__name">' + title + '</h3>' +
+      '<p class="gcard__desc">' + p.description + '</p>';
+
+    var tiles = document.createElement('div');
+    tiles.className = 'tiles';
+    c.forEach(function(col){ tiles.appendChild(makeTile(col)); });
+    card.appendChild(tiles);
+
+    frag.appendChild(card);
+  });
+  grid.appendChild(frag);
+})();
+
+var cards = [].slice.call(document.querySelectorAll('.pcard'));
+
+/* hero swatches: randomise to one of our curated palettes on each load */
+(function randomHeroSwatches(){
+  var sets = [
+    ['0E0E10','2B2B30','C9A9A6','E9D5D0','F4EEEA'],  // Graphite Bloom
+    ['131210','C9742E','E0A23B','F0E2C4','FBF7EE'],  // Saffron Static
+    ['181513','E2664F','F0A18C','DAD3CB','FBF4EF'],  // Coral Concrete
+    ['0A0E1A','1E2A52','4A5DA8','A7B4DE','ECEFF7'],  // Indigo Depths
+    ['0B1417','1F3C42','C2603B','9DB5B5','E8EEED']   // Petrol Dusk
+  ];
+  var pick = sets[Math.floor(Math.random() * sets.length)];
+  document.querySelectorAll('.hsw').forEach(function(el, i){
+    var hex = pick[i];
+    if(!hex) return;
+    el.style.setProperty('--c', '#' + hex);
+    // pick a label colour that actually reads on this swatch (luminance, not blend mode)
+    var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), bl = parseInt(hex.slice(4,6),16);
+    var lum = (r*299 + g*587 + bl*114) / 1000;
+    var b = el.querySelector('b');
+    if(b){ b.textContent = hex; b.style.color = lum > 150 ? 'rgba(20,19,25,.92)' : 'rgba(255,255,255,.94)'; }
+  });
+})();
+
+/* ============================================================
+   STATIC MODE - reduced motion / ?static: leave the cards as a list
+   ============================================================ */
+if(prefersReduce || forceStatic){
+  document.body.classList.add('is-static');
+} else {
+  initMotion();
+}
+
+/* nav + FAQ work in every mode (no GSAP dependency) */
+initNav();
+initFaq();
+(function(){ var y = document.getElementById('yr'); if(y) y.textContent = new Date().getFullYear(); })();
+/* assemble the contact address client-side so crawlers don't harvest it */
+(function(){
+  var nodes = document.querySelectorAll('.js-mail');
+  for (var i=0;i<nodes.length;i++){
+    var a = nodes[i], e = a.dataset.u + String.fromCharCode(64) + a.dataset.d;
+    a.setAttribute('href','mailto:'+e);
+    if (a.textContent.indexOf('@') > -1 || a.dataset.show==='1') a.textContent = e;
+  }
+})();
+
+/* ---- nav: smooth-scroll to sections (Lenis when live) + active state ---- */
+function initNav(){
+  var nav = document.getElementById('nav');
+  if(!nav) return;
+  var links = [].slice.call(nav.querySelectorAll('.nav__item'));
+  var targets = links.map(function(a){ return { a:a, el:document.getElementById(a.getAttribute('data-target')), top:a.getAttribute('data-target')==='top' }; });
+  links.forEach(function(a){
+    a.addEventListener('click', function(e){
+      var el = document.getElementById(a.getAttribute('data-target'));
+      if(!el) return;
+      e.preventDefault();
+      var off = a.getAttribute('data-target')==='top' ? 0 : -(nav.offsetHeight + 24);
+      if(window.__lenis){ window.__lenis.scrollTo(el, {offset:off, duration:1.1}); }
+      else { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + off, behavior:'smooth' }); }
+    });
+  });
+  function refresh(){
+    var line = window.scrollY + window.innerHeight * 0.34;
+    var active = targets[0];
+    targets.forEach(function(t){ if(t.el && t.el.getBoundingClientRect().top + window.scrollY <= line) active = t; });
+    links.forEach(function(a){ a.classList.toggle('is-active', a === active.a); });
+  }
+  window.addEventListener('scroll', refresh, {passive:true});
+  window.addEventListener('resize', refresh);
+  refresh();
+}
+
+/* ---- FAQ: one row open at a time, breathing height like the archive ---- */
+function initFaq(){
+  var rows = [].slice.call(document.querySelectorAll('.faqx'));
+  rows.forEach(function(row){
+    var btn = row.querySelector('.frow');
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      var isOpen = row.classList.contains('open');
+      rows.forEach(function(r){ r.classList.remove('open'); var b = r.querySelector('.frow'); if(b) b.setAttribute('aria-expanded','false'); });
+      if(!isOpen){ row.classList.add('open'); btn.setAttribute('aria-expanded','true'); }
+    });
+  });
+}
+
+/* ============================================================
+   MOTION - Lenis smooth scroll, GSAP stack recede, three.js wash
+   ============================================================ */
+function initMotion(){
+  gsap.registerPlugin(ScrollTrigger);
+
+  var lenis = new Lenis({duration:1.1, smoothWheel:true});
+  window.__lenis = lenis;
+  lenis.on('scroll', ScrollTrigger.update);
+  gsap.ticker.add(function(t){ lenis.raf(t * 1000); });
+  gsap.ticker.lagSmoothing(0);
+  ScrollTrigger.addEventListener('refresh', function(){ lenis.resize(); });
+
+  // hero swatches: deal in on load, then lift + spin away as the first card rises
+  gsap.from('.hsw', {y:34, scale:.66, rotate:-12, opacity:0, duration:.9, ease:'back.out(1.6)', stagger:.085, delay:.15});
+  gsap.to('.hsw', {y:-150, opacity:0, rotate:function(i){ return (i - 2) * 34; }, ease:'none', immediateRender:false,
+    scrollTrigger:{trigger:'.hero', start:'top top', end:'bottom 18%', scrub:true}});
+
+  // as each card is covered by the next, settle it back: shrink a touch + darken,
+  // so the pile reads with depth. Scrubbed, so it runs smoothly both directions.
+  cards.forEach(function(card, i){
+    if(i === cards.length - 1) return;
+    gsap.fromTo(card,
+      {scale:1, filter:'brightness(1)'},
+      {scale:0.93, filter:'brightness(0.62)', ease:'none',
+       scrollTrigger:{trigger:cards[i + 1], start:'top bottom', end:'top top', scrub:true}});
+  });
+
+  // grid cards rise in as the grid scrolls into view
+  var gcards = gsap.utils.toArray('.gcard');
+  if(gcards.length){
+    gsap.from(gcards, {y:28, opacity:0, duration:.6, ease:'power2.out', stagger:.06,
+      scrollTrigger:{trigger:'.pgrid', start:'top 82%'}});
+  }
+
+  // FAQ head + rows lift in
+  gsap.from('.faq__head > *', {y:22, opacity:0, duration:.6, ease:'power2.out', stagger:.1,
+    scrollTrigger:{trigger:'.faq', start:'top 80%'}});
+  gsap.from('.faqx', {y:18, opacity:0, duration:.5, ease:'power2.out', stagger:.05,
+    scrollTrigger:{trigger:'.faq__list', start:'top 85%'}});
+
+  // footer reveal: content rises, then the giant wordmark fills with ink on approach
+  gsap.from('.foot__top, .foot__base', {y:26, opacity:0, duration:.7, ease:'power2.out', stagger:.12,
+    scrollTrigger:{trigger:'.foot', start:'top 78%'}});
+  gsap.to('.foot__word', {'--fill':'120%', ease:'none',
+    scrollTrigger:{trigger:'.foot', start:'top 65%', end:'bottom bottom', scrub:0.6}});
+
+  // honour a ?p=N deep link → scroll that card into view
+  setTimeout(function(){
+    ScrollTrigger.refresh();
+    lenis.resize();
+    var jump = parseInt((location.search.match(/[?&]p=(\d+)/) || [])[1], 10);
+    var el = jump >= 1 && jump <= PALETTES.length ? document.getElementById('p' + jump) : null;
+    if(el){
+      var stick = parseFloat(getComputedStyle(el).top);
+      lenis.scrollTo(el, {offset: el.classList.contains('pcard') ? -(stick || 80) + 1 : -90, immediate:true});
+    }
+  }, 300);
+
+  initAmbient();
+}
+
+/* ---- subtle three.js wash: a few soft pastel blobs drifting behind it all ---- */
+function initAmbient(){
+  var canvas = document.getElementById('amb');
+  var renderer;
+  try{
+    renderer = new THREE.WebGLRenderer({canvas:canvas, alpha:true, antialias:true, powerPreference:'low-power'});
+  }catch(e){ return; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  function blobTexture(rgb){
+    var s = 256, c = document.createElement('canvas');
+    c.width = c.height = s;
+    var x = c.getContext('2d');
+    var g = x.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+    g.addColorStop(0, 'rgba(' + rgb + ',1)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+    x.fillStyle = g; x.fillRect(0, 0, s, s);
+    var t = new THREE.CanvasTexture(c);
+    return t;
+  }
+  var tones = ['232,201,210', '178,212,201', '201,196,228', '240,222,196'];
+  var blobs = tones.map(function(rgb){
+    var m = new THREE.SpriteMaterial({map:blobTexture(rgb), transparent:true, opacity:0.6, depthTest:false});
+    var sp = new THREE.Sprite(m);
+    sp.scale.set(1.7, 1.7, 1);
+    scene.add(sp);
+    return sp;
+  });
+
+  function resize(){
+    renderer.setSize(innerWidth, innerHeight, false);
+    var a = innerWidth / innerHeight;
+    camera.left = -a; camera.right = a;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  var visible = true;
+  document.addEventListener('visibilitychange', function(){ visible = !document.hidden; });
+
+  var t = 0;
+  gsap.ticker.add(function(){
+    if(!visible) return;
+    t += 0.0015;
+    blobs[0].position.set(Math.sin(t * 0.7) * 0.9 - 0.4, Math.cos(t * 0.6) * 0.5 + 0.35, 0);
+    blobs[1].position.set(Math.sin(t * 0.5 + 2) * 1.0 + 0.4, Math.cos(t * 0.8 + 1) * 0.6 - 0.25, 0);
+    blobs[2].position.set(Math.sin(t * 0.6 + 4) * 0.7, Math.cos(t * 0.5 + 3) * 0.75, 0);
+    blobs[3].position.set(Math.sin(t * 0.45 + 1) * 0.8 + 0.2, Math.cos(t * 0.55 + 5) * 0.55 + 0.1, 0);
+    renderer.render(scene, camera);
+  });
+}
+
+/* ============================================================
+   SWATCH BUILDER - colour-theory harmony generator
+   ============================================================ */
+(function builder(){
+  var bs = document.getElementById('bswatches');
+  if(!bs) return;
+
+  var state = { mode:'analogous', h:265, s:54, l:57 };
+  var locks = [null, null, null, null, null];   // per-slot pinned hex, or null = follow harmony
+
+  // each harmony is five swatches as [hueOffset, satOffset, lightOffset] from the base,
+  // shaped to land a deep anchor, the base, the theory accents, and a light tint.
+  // every harmony keeps a [0,0,0] swatch so the chosen base colour always appears exactly.
+  var HARMONIES = {
+    monochrome:    { label:'Mono',       sw:[[0,6,-42],[0,2,-22],[0,0,0],[0,-12,18],[0,-24,33]] },
+    analogous:     { label:'Analogous',  sw:[[-46,6,-34],[-22,1,-9],[0,0,0],[24,-5,13],[46,-15,27]] },
+    complementary: { label:'Complement', sw:[[0,6,-36],[0,1,-8],[0,0,0],[180,0,-2],[180,-16,28]] },
+    split:         { label:'Split',      sw:[[0,6,-34],[0,0,0],[150,-2,5],[210,-3,-4],[0,-20,30]] },
+    triad:         { label:'Triad',      sw:[[0,6,-36],[0,0,0],[120,-4,2],[240,-6,-3],[0,-22,32]] },
+    square:        { label:'Square',     sw:[[0,0,0],[90,-6,5],[180,-8,-2],[270,-6,5],[0,8,-38]] }
+  };
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function hexToHsl(hex){
+    hex = hex.replace('#','');
+    if(hex.length === 3) hex = hex.replace(/./g, '$&$&');
+    var r = parseInt(hex.slice(0,2),16)/255, g = parseInt(hex.slice(2,4),16)/255, b = parseInt(hex.slice(4,6),16)/255;
+    var max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min, h = 0, l = (max + min)/2, s = 0;
+    if(d){
+      s = d / (1 - Math.abs(2*l - 1));
+      if(max === r) h = ((g - b)/d) % 6;
+      else if(max === g) h = (b - r)/d + 2;
+      else h = (r - g)/d + 4;
+      h *= 60; if(h < 0) h += 360;
+    }
+    return { h:h, s:s*100, l:l*100 };
+  }
+  function hslToHex(h,s,l){
+    h = ((h % 360) + 360) % 360; s = clamp(s,0,100)/100; l = clamp(l,0,100)/100;
+    var c = (1 - Math.abs(2*l - 1)) * s, x = c * (1 - Math.abs((h/60) % 2 - 1)), m = l - c/2, r=0,g=0,b=0;
+    if(h < 60){ r=c; g=x; } else if(h < 120){ r=x; g=c; } else if(h < 180){ g=c; b=x; }
+    else if(h < 240){ g=x; b=c; } else if(h < 300){ r=x; b=c; } else { r=c; b=x; }
+    var to = function(v){ return ('0' + Math.round((v + m) * 255).toString(16)).slice(-2); };
+    return ('#' + to(r) + to(g) + to(b)).toUpperCase();
+  }
+  function generate(){
+    // locked slots keep their pinned colour; the rest follow the harmony.
+    // tones stay tinted (never pure black/white) while in-range bases stay exact.
+    return HARMONIES[state.mode].sw.map(function(o, i){
+      if(locks[i]) return locks[i];
+      return hslToHex(state.h + o[0], state.s + o[1], clamp(state.l + o[2], 6, 96));
+    });
+  }
+
+  // harmony pills
+  var harmony = document.getElementById('harmony');
+  var pills = Object.keys(HARMONIES).map(function(key){
+    var b = document.createElement('button');
+    b.type = 'button'; b.dataset.mode = key; b.textContent = HARMONIES[key].label;
+    b.setAttribute('aria-pressed', key === state.mode);
+    b.addEventListener('click', function(){ state.mode = key; render(); });
+    harmony.appendChild(b);
+    return b;
+  });
+
+  // swatch buttons (each wrapped so a lock toggle can sit in the corner)
+  var LK_OPEN = '<svg class="lk-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-1.9"/></svg>';
+  var LK_SHUT = '<svg class="lk-shut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  var sw = [], lockBtns = [];
+  for(var i = 0; i < 5; i++){
+    (function(idx){
+      var wrap = document.createElement('div'); wrap.className = 'bswatch-wrap';
+      var btn = document.createElement('button'); btn.className = 'bswatch'; btn.type = 'button';
+      btn.innerHTML = '<span class="bswatch__hex"><span class="h"></span><span class="d" aria-hidden="true">Copied</span></span>';
+      btn.addEventListener('click', function(){ copyHex(this.dataset.hex, this); });
+      var lock = document.createElement('button'); lock.className = 'bswatch__lock'; lock.type = 'button';
+      lock.innerHTML = LK_OPEN + LK_SHUT;
+      lock.setAttribute('aria-pressed', 'false'); lock.setAttribute('aria-label', 'Lock colour ' + (idx + 1));
+      lock.addEventListener('click', function(){ toggleLock(idx); });
+      wrap.appendChild(btn); wrap.appendChild(lock);
+      bs.appendChild(wrap);
+      sw.push(btn); lockBtns.push(lock);
+    })(i);
+  }
+  function toggleLock(idx){
+    locks[idx] = locks[idx] ? null : (curHexes[idx] || generate()[idx]);
+    render();
+  }
+
+  // sliders
+  var sH = document.getElementById('sH'), sS = document.getElementById('sS'), sL = document.getElementById('sL');
+  var vH = document.getElementById('vH'), vS = document.getElementById('vS'), vL = document.getElementById('vL');
+  sH.value = state.h; sS.value = state.s; sL.value = state.l;
+  sH.addEventListener('input', function(){ state.h = +this.value; render(); });
+  sS.addEventListener('input', function(){ state.s = +this.value; render(); });
+  sL.addEventListener('input', function(){ state.l = +this.value; render(); });
+
+  // seed the generator from an exact colour: the wheel picker or a typed hex
+  var bPick = document.getElementById('bPick'), bHex = document.getElementById('bHex');
+  function applyBase(hex){
+    var c = hexToHsl(hex);
+    state.h = c.h; state.s = c.s; state.l = c.l;
+    sH.value = Math.round(c.h); sS.value = Math.round(c.s); sL.value = clamp(Math.round(c.l), 12, 88);
+    render();
+  }
+  bPick.addEventListener('input', function(){ applyBase(this.value); });
+  bHex.addEventListener('input', function(){
+    var v = this.value.trim().replace(/^#/, '');
+    if(/^[0-9a-fA-F]{6}$/.test(v)) applyBase('#' + v);
+    else if(/^[0-9a-fA-F]{3}$/.test(v)) applyBase('#' + v.replace(/./g, '$&$&'));
+  });
+
+  // shuffle the base into a fresh, pleasing range
+  document.getElementById('bShuffle').addEventListener('click', function(){
+    state.h = Math.floor(Math.random() * 360);
+    state.s = Math.round(42 + Math.random() * 30);
+    state.l = Math.round(48 + Math.random() * 14);
+    sH.value = state.h; sS.value = state.s; sL.value = state.l;
+    render();
+  });
+
+  // export the palette as CSS custom properties
+  var copyBtn = document.getElementById('bCopy');
+  copyBtn.addEventListener('click', function(){
+    var css = sw.map(function(b, i){ return '--swatch-' + (i + 1) + ': ' + b.dataset.hex + ';'; }).join('\n');
+    var done = function(){ var prev = copyBtn.textContent; copyBtn.textContent = 'Copied'; setTimeout(function(){ copyBtn.textContent = prev; }, 1100); };
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(css).then(done, done); }
+    else { done(); }
+  });
+
+  /* ---- export: render the current palette as a deck-ready PNG or SVG card ---- */
+  var exName = document.getElementById('exName'), exLabel = document.getElementById('exLabel'),
+      exDesc = document.getElementById('exDesc');
+  var exNameInputs = [];
+  var exNamesWrap = document.getElementById('exNames');
+  for(var n = 0; n < 5; n++){
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'exname'; inp.autocomplete = 'off';
+    inp.setAttribute('aria-label', 'Swatch ' + (n + 1) + ' name');
+    exNamesWrap.appendChild(inp); exNameInputs.push(inp);
+  }
+
+  var measCtx = document.createElement('canvas').getContext('2d');
+  function fontFor(o){ return (o.weight || 400) + ' ' + o.size + 'px ' + (o.mono ? '"Martian Mono"' : '"Clash Display"'); }
+  function wrapLines(str, font, maxw, maxLines){
+    measCtx.font = font;
+    var words = str.split(' '), lines = [], cur = '';
+    for(var i = 0; i < words.length; i++){
+      var test = cur ? cur + ' ' + words[i] : words[i];
+      if(measCtx.measureText(test).width > maxw && cur){ lines.push(cur); cur = words[i]; if(maxLines && lines.length >= maxLines){ cur = ''; break; } }
+      else cur = test;
+    }
+    if(cur) lines.push(cur);
+    return lines;
+  }
+  function exportData(){
+    var hexes = generate();
+    return {
+      hexes: hexes,
+      title: exName.value.trim() || 'Untitled palette',
+      label: (exLabel.value.trim() || (HARMONIES[state.mode].label + ' harmony')).toUpperCase(),
+      description: exDesc.value.trim(),
+      names: exNameInputs.map(function(i){ return i.value.trim(); })
+    };
+  }
+  // a renderer-agnostic list of draw ops so the PNG and SVG come out identical
+  function buildLayout(){
+    var d = exportData(), W = 1600, H = 1040, pad = 84, ops = [];
+    var dark = !isLight(d.hexes[0]);
+    var bg = dark ? d.hexes[0] : '#14131A';
+    var fg = dark ? d.hexes[4] : '#F4F1EA';
+    var fg2 = dark ? d.hexes[3] : '#9A96A4';
+    ops.push({ t:'rect', x:0, y:0, w:W, h:H, r:42, fill:bg });
+    ops.push({ t:'text', x:pad, y:pad + 24, str:'made with tryswatch.com', mono:1, size:24, weight:400, fill:fg2, tracking:0.04 });
+    ops.push({ t:'text', x:W - pad, y:pad + 24, str:d.label, mono:1, size:24, weight:400, fill:fg2, align:'right', tracking:0.06 });
+    var words = d.title.split(' '), first = words.shift(), rest = words.join(' ');
+    var tS = 152, tY = pad + 172, after = tY + tS * 0.5;
+    ops.push({ t:'text', x:pad, y:tY, str:first, size:tS, weight:700, fill:fg, tracking:-0.04 });
+    if(rest){ ops.push({ t:'text', x:pad, y:tY + tS * 0.9, str:rest, size:tS, weight:700, fill:fg2, tracking:-0.04 }); after = tY + tS * 0.9 + tS * 0.5; }
+    if(d.description){
+      var dl = wrapLines(d.description, fontFor({ weight:500, size:38 }), W * 0.6, 3);
+      ops.push({ t:'lines', x:pad, y:after + 60, lines:dl, size:38, weight:500, fill:fg, lh:48, opacity:0.9 });
+    }
+    var tileH = 304, gap = 16, tileW = (W - 2 * pad - 4 * gap) / 5, tileY = H - pad - tileH;
+    for(var i = 0; i < 5; i++){
+      var tx = pad + i * (tileW + gap), hx = d.hexes[i], lt = isLight(hx), tc = lt ? '#1A1814' : '#FBFAF6';
+      ops.push({ t:'rect', x:tx, y:tileY, w:tileW, h:tileH, r:18, fill:hx, stroke:lt ? '#000' : '#fff', strokeOp:0.14 });
+      if(d.names[i]){ var nl = wrapLines(d.names[i], fontFor({ mono:1, weight:300, size:25 }), tileW - 44, 2); ops.push({ t:'lines', x:tx + 24, y:tileY + 44, lines:nl, size:25, weight:300, mono:1, fill:tc, lh:30 }); }
+      ops.push({ t:'text', x:tx + 24, y:tileY + tileH - 28, str:hx.slice(1), size:27, weight:300, mono:1, fill:tc, tracking:0.08 });
+    }
+    return { W:W, H:H, ops:ops };
+  }
+  function rrect(x, X, Y, W, H, r){ x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + W, Y, X + W, Y + H, r); x.arcTo(X + W, Y + H, X, Y + H, r); x.arcTo(X, Y + H, X, Y, r); x.arcTo(X, Y, X + W, Y, r); x.closePath(); }
+  function renderCanvas(layout, scale){
+    var cv = document.createElement('canvas'); cv.width = layout.W * scale; cv.height = layout.H * scale;
+    var x = cv.getContext('2d'); x.scale(scale, scale); x.textBaseline = 'alphabetic';
+    layout.ops.forEach(function(o){
+      if(o.t === 'rect'){ rrect(x, o.x, o.y, o.w, o.h, o.r); x.fillStyle = o.fill; x.fill(); if(o.stroke){ x.save(); x.globalAlpha = o.strokeOp || 1; x.strokeStyle = o.stroke; x.lineWidth = 1.5; x.stroke(); x.restore(); } }
+      else { x.save(); x.font = fontFor(o); x.fillStyle = o.fill; x.textAlign = o.align || 'left'; if('letterSpacing' in x) x.letterSpacing = (o.tracking ? o.tracking * o.size : 0) + 'px'; if(o.opacity) x.globalAlpha = o.opacity;
+        if(o.t === 'text') x.fillText(o.str, o.x, o.y);
+        else o.lines.forEach(function(ln, i){ x.fillText(ln, o.x, o.y + i * o.lh); });
+        x.restore(); }
+    });
+    return cv;
+  }
+  function escXml(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function svgEl(str, o, X, Y){
+    var anchor = o.align === 'right' ? 'end' : 'start', fam = o.mono ? 'Martian Mono' : 'Clash Display';
+    return '<text x="' + X.toFixed(1) + '" y="' + Y.toFixed(1) + '" font-family="\'' + fam + '\', sans-serif" font-weight="' + (o.weight || 400) + '" font-size="' + o.size + '" fill="' + o.fill + '" text-anchor="' + anchor + '"' + (o.tracking ? ' letter-spacing="' + (o.tracking * o.size).toFixed(2) + '"' : '') + (o.opacity ? ' opacity="' + o.opacity + '"' : '') + '>' + escXml(str) + '</text>';
+  }
+  function renderSVG(layout, fontCSS){
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + layout.W + '" height="' + layout.H + '" viewBox="0 0 ' + layout.W + ' ' + layout.H + '"><defs><style>' + fontCSS + '</style></defs>';
+    layout.ops.forEach(function(o){
+      if(o.t === 'rect') s += '<rect x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="' + o.r + '" fill="' + o.fill + '"' + (o.stroke ? ' stroke="' + o.stroke + '" stroke-opacity="' + (o.strokeOp || 1) + '" stroke-width="1.5"' : '') + '/>';
+      else if(o.t === 'text') s += svgEl(o.str, o, o.x, o.y);
+      else o.lines.forEach(function(ln, i){ s += svgEl(ln, o, o.x, o.y + i * o.lh); });
+    });
+    return s + '</svg>';
+  }
+  var fontCSSCache = null;
+  function getFontCSS(){
+    if(fontCSSCache) return Promise.resolve(fontCSSCache);
+    function enc(p){ return fetch(p).then(function(r){ return r.arrayBuffer(); }).then(function(b){ var u = new Uint8Array(b), s = ''; for(var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return 'data:font/woff2;base64,' + btoa(s); }); }
+    return Promise.all([enc('vendor/fonts/clash-display-700.woff2'), enc('vendor/fonts/clash-display-500.woff2'), enc('vendor/fonts/martian-mono-300-latin.woff2')]).then(function(f){
+      fontCSSCache = "@font-face{font-family:'Clash Display';font-weight:700;src:url('" + f[0] + "') format('woff2')}" +
+        "@font-face{font-family:'Clash Display';font-weight:500;src:url('" + f[1] + "') format('woff2')}" +
+        "@font-face{font-family:'Martian Mono';font-weight:300;src:url('" + f[2] + "') format('woff2')}";
+      return fontCSSCache;
+    });
+  }
+  function download(blob, name){ var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000); }
+  function slug(s){ return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+  function slugName(){ return slug(exName.value.trim()) || 'swatch-palette'; }
+  function fname(ext){ return slugName() + '.' + ext; }
+  function downloadText(text, name, type){ download(new Blob([text], { type: (type || 'text/plain') + ';charset=utf-8' }), name); }
+  function flash(btn){ var p = btn.textContent; btn.textContent = 'Downloaded'; setTimeout(function(){ btn.textContent = p; }, 1300); }
+  document.getElementById('exPng').addEventListener('click', function(){
+    var btn = this;
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(function(){
+      renderCanvas(buildLayout(), 2).toBlob(function(blob){ download(blob, fname('png')); flash(btn); }, 'image/png');
+    });
+  });
+  document.getElementById('exSvg').addEventListener('click', function(){
+    var btn = this;
+    getFontCSS().then(function(css){ download(new Blob([renderSVG(buildLayout(), css)], { type:'image/svg+xml' }), fname('svg')); flash(btn); });
+  });
+
+  /* ---- data exports: Tailwind config, JSON, Adobe .ase ---- */
+  function tailwindConfig(){
+    var d = exportData();
+    var lines = d.hexes.map(function(hex, i){ var key = (d.names[i] ? slug(d.names[i]) : '') || ('swatch-' + (i + 1)); return "          '" + key + "': '" + hex + "',"; });
+    return "// tailwind.config.js\n/** @type {import('tailwindcss').Config} */\nmodule.exports = {\n  theme: {\n    extend: {\n      colors: {\n        '" + slugName() + "': {\n" + lines.join('\n') + "\n        },\n      },\n    },\n  },\n}\n";
+  }
+  function jsonExport(){
+    var d = exportData();
+    return JSON.stringify({
+      name: exName.value.trim() || null,
+      label: exLabel.value.trim() || null,
+      description: d.description || null,
+      harmony: state.mode,
+      base: hslToHex(state.h, state.s, state.l),
+      colors: d.hexes.map(function(hex, i){
+        var hsl = hexToHsl(hex);
+        return { name: d.names[i] || null, hex: hex,
+          rgb: [parseInt(hex.substr(1,2),16), parseInt(hex.substr(3,2),16), parseInt(hex.substr(5,2),16)],
+          hsl: [Math.round(hsl.h), Math.round(hsl.s), Math.round(hsl.l)] };
+      })
+    }, null, 2);
+  }
+  function aseStr(s){ var a = []; for(var i = 0; i < s.length; i++) a.push(s.charCodeAt(i)); a.push(0); return a; }
+  function buildASE(){
+    var d = exportData();
+    var blocks = [];
+    var gName = aseStr(exName.value.trim() || 'Swatch palette');
+    blocks.push({ type:0xC001, len: 2 + gName.length * 2, body: function(w){ w.u16(gName.length); for(var i = 0; i < gName.length; i++) w.u16(gName[i]); } });
+    d.hexes.forEach(function(hex, i){
+      var nm = aseStr(d.names[i] || hex);
+      blocks.push({ type:0x0001, len: 2 + nm.length * 2 + 4 + 12 + 2, body: function(w){
+        w.u16(nm.length); for(var k = 0; k < nm.length; k++) w.u16(nm[k]);
+        w.str('RGB ');
+        w.f32(parseInt(hex.substr(1,2),16) / 255); w.f32(parseInt(hex.substr(3,2),16) / 255); w.f32(parseInt(hex.substr(5,2),16) / 255);
+        w.u16(2);
+      }});
+    });
+    blocks.push({ type:0xC002, len:0, body: function(){} });
+    var total = 12; blocks.forEach(function(b){ total += 6 + b.len; });
+    var dv = new DataView(new ArrayBuffer(total)), o = { v:0 };
+    var w = {
+      u16:function(x){ dv.setUint16(o.v, x, false); o.v += 2; },
+      u32:function(x){ dv.setUint32(o.v, x, false); o.v += 4; },
+      f32:function(x){ dv.setFloat32(o.v, x, false); o.v += 4; },
+      str:function(s){ for(var i = 0; i < s.length; i++){ dv.setUint8(o.v, s.charCodeAt(i)); o.v++; } }
+    };
+    w.str('ASEF'); w.u16(1); w.u16(0); w.u32(blocks.length);
+    blocks.forEach(function(b){ w.u16(b.type); w.u32(b.len); b.body(w); });
+    return dv.buffer;
+  }
+  document.getElementById('exTw').addEventListener('click', function(){ downloadText(tailwindConfig(), slugName() + '.tailwind.js', 'text/javascript'); flash(this); });
+  document.getElementById('exJson').addEventListener('click', function(){ downloadText(jsonExport(), fname('json'), 'application/json'); flash(this); });
+  document.getElementById('exAse').addEventListener('click', function(){ download(new Blob([buildASE()], { type:'application/octet-stream' }), fname('ase')); flash(this); });
+
+  /* ---- contrast / WCAG checker ---- */
+  var cFg = 4, cBg = 0, curHexes = generate();
+  var cPrev = document.getElementById('cPrev'), cRatio = document.getElementById('cRatio'),
+      cBadges = document.getElementById('cBadges'), cFgChips = document.getElementById('cFgChips'),
+      cBgChips = document.getElementById('cBgChips');
+  function relLum(hex){
+    var f = function(h){ var v = parseInt(h, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(hex.substr(1,2)) + 0.7152 * f(hex.substr(3,2)) + 0.0722 * f(hex.substr(5,2));
+  }
+  function contrastRatio(a, b){ var l1 = relLum(a) + 0.05, l2 = relLum(b) + 0.05; return l1 > l2 ? l1 / l2 : l2 / l1; }
+  var BADGES = [{k:'AA', min:4.5}, {k:'AAA', min:7}, {k:'AA Large', min:3}, {k:'AAA Large', min:4.5}];
+  var badgeEls = BADGES.map(function(b){ var s = document.createElement('span'); s.className = 'cbadge'; s.textContent = b.k; cBadges.appendChild(s); return s; });
+  function buildChips(wrap, which){
+    var chips = [];
+    for(var i = 0; i < 5; i++){
+      (function(idx){
+        var c = document.createElement('button'); c.type = 'button'; c.className = 'cchip';
+        c.setAttribute('aria-label', (which === 'fg' ? 'Text' : 'Background') + ' colour ' + (idx + 1));
+        c.addEventListener('click', function(){ if(which === 'fg') cFg = idx; else cBg = idx; renderContrast(); });
+        wrap.appendChild(c); chips.push(c);
+      })(i);
+    }
+    return chips;
+  }
+  var fgChips = buildChips(cFgChips, 'fg'), bgChips = buildChips(cBgChips, 'bg');
+  function renderContrast(){
+    var fg = curHexes[cFg], bg = curHexes[cBg], ratio = contrastRatio(fg, bg);
+    cPrev.style.backgroundColor = bg; cPrev.style.color = fg;
+    cRatio.textContent = ratio.toFixed(2);
+    badgeEls.forEach(function(el, i){ el.classList.toggle('pass', ratio >= BADGES[i].min); });
+    fgChips.forEach(function(c, i){ c.style.backgroundColor = curHexes[i]; c.setAttribute('aria-pressed', i === cFg); });
+    bgChips.forEach(function(c, i){ c.style.backgroundColor = curHexes[i]; c.setAttribute('aria-pressed', i === cBg); });
+  }
+
+  /* ---- shareable URL state (?c=hex&m=mode) ---- */
+  var started = false, urlTimer;
+  function updateURL(){
+    clearTimeout(urlTimer);
+    urlTimer = setTimeout(function(){
+      var base = hslToHex(state.h, state.s, state.l).slice(1);
+      var qs = '?c=' + base + '&m=' + state.mode;
+      if(locks.some(Boolean)) qs += '&l=' + locks.map(function(x){ return x ? x.slice(1) : ''; }).join('-');
+      history.replaceState(null, '', location.pathname + qs);
+    }, 250);
+  }
+  document.getElementById('bShare').addEventListener('click', function(){
+    var btn = this, done = function(){ var p = btn.textContent; btn.textContent = 'Link copied'; setTimeout(function(){ btn.textContent = p; }, 1200); };
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(location.href).then(done, done); } else done();
+  });
+
+  function render(){
+    var hexes = generate();
+    curHexes = hexes;
+    sw.forEach(function(btn, i){
+      var hex = hexes[i];
+      btn.style.backgroundColor = hex;
+      btn.style.color = isLight(hex) ? '#1A1814' : '#FBFAF6';
+      btn.dataset.hex = hex;
+      btn.querySelector('.h').textContent = hex.slice(1);
+      btn.setAttribute('aria-label', 'Copy ' + hex);
+    });
+    renderContrast();
+    lockBtns.forEach(function(b, i){ var on = !!locks[i]; b.setAttribute('aria-pressed', on); b.classList.toggle('is-locked', on); });
+    exNameInputs.forEach(function(inp, i){ inp.placeholder = hexes[i].slice(1); });
+    pills.forEach(function(p){ p.setAttribute('aria-pressed', p.dataset.mode === state.mode); });
+    vH.textContent = Math.round(state.h); vS.textContent = Math.round(state.s); vL.textContent = Math.round(state.l);
+    sS.style.background = 'linear-gradient(90deg,' + hslToHex(state.h, 0, state.l) + ',' + hslToHex(state.h, 100, state.l) + ')';
+    sL.style.background = 'linear-gradient(90deg,' + hslToHex(state.h, state.s, 14) + ',' + hslToHex(state.h, state.s, 50) + ',' + hslToHex(state.h, state.s, 90) + ')';
+    // reflect the current base colour in the wheel + hex field
+    var baseHex = hslToHex(state.h, state.s, state.l);
+    bPick.value = baseHex.toLowerCase();
+    if(document.activeElement !== bHex) bHex.value = baseHex.slice(1);
+    if(started) updateURL();
+  }
+
+  // seed from a shared link (?c=hex&m=mode) before the first paint
+  var params = new URLSearchParams(location.search);
+  var pc = (params.get('c') || '').replace(/[^0-9a-fA-F]/g, ''), pm = params.get('m');
+  if(pm && HARMONIES[pm]) state.mode = pm;
+  if(/^[0-9a-fA-F]{6}$/.test(pc)){
+    var seed = hexToHsl('#' + pc);
+    state.h = seed.h; state.s = seed.s; state.l = seed.l;
+    sH.value = Math.round(seed.h); sS.value = Math.round(seed.s); sL.value = clamp(Math.round(seed.l), 12, 88);
+  }
+  var pl = params.get('l');
+  if(pl){ pl.split('-').slice(0, 5).forEach(function(h, i){ if(/^[0-9a-fA-F]{6}$/.test(h)) locks[i] = '#' + h.toUpperCase(); }); }
+  render();
+  started = true;
+  if(pc || pm){
+    setTimeout(function(){
+      var b = document.querySelector('.builder');
+      if(window.__lenis) window.__lenis.scrollTo(b, { offset:-20, immediate:true });
+      else b.scrollIntoView();
+    }, 500);
+  }
+})();
+</script>
+</body>
+</html>

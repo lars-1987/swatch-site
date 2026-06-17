@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Python (build-og.py tooling)
+__pycache__/
+*.pyc
+.venv/
+venv/
